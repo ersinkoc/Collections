@@ -1,0 +1,37 @@
+# Source files
+src/
+tests/
+examples/
+benchmarks/
+docs/
+scripts/
+
+# Configuration files
+.eslintrc.js
+.prettierrc
+.editorconfig
+.gitignore
+jest.config.js
+tsconfig*.json
+.github/
+
+# Test coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Git
+.git/
+.gitignore
+
+# Package manager files  
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

@@ -1,0 +1,36 @@
+import { validateObject, validateFunction } from '../../utils/validators';
+
+/**
+ * Transforms object keys using a mapper function.
+ * 
+ * @param source - The source object
+ * @param mapper - Function to transform each key
+ * @returns New object with transformed keys
+ * @throws {ValidationError} When source is not an object or mapper is not a function
+ * 
+ * @example
+ * ```typescript
+ * mapKeys({ a: 1, b: 2 }, key => key.toUpperCase());
+ * // Returns: { A: 1, B: 2 }
+ * ```
+ * 
+ * @complexity O(n) - Where n is the number of properties
+ * @since 1.0.0
+ */
+export function mapKeys<T extends Record<string, unknown>, K extends string>(
+  source: T,
+  mapper: (key: string, value: T[keyof T], index: number) => K
+): Record<K, T[keyof T]> {
+  validateObject(source, 'source');
+  validateFunction(mapper, 'mapper');
+
+  const result: Record<K, T[keyof T]> = {} as Record<K, T[keyof T]>;
+  const entries = Object.entries(source) as Array<[string, T[keyof T]]>;
+
+  entries.forEach(([key, value], index) => {
+    const newKey = mapper(key, value, index);
+    result[newKey] = value;
+  });
+
+  return result;
+}

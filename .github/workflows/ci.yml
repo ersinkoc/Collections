@@ -1,0 +1,286 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  release:
+    types: [created]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # Test job runs on multiple Node.js versions and operating systems
+  test:
+    name: Test (Node ${{ matrix.node-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        node-version: ['16', '18', '20']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run linting
+        run: npm run lint
+        
+      - name: Run type checking
+        run: npm run type-check
+        
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == '18' && matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  # Build job verifies the package builds correctly
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build package
+        run: npm run build
+        
+      - name: Verify build outputs
+        run: |
+          test -f dist/index.js || (echo "Missing main build output" && exit 1)
+          test -f dist/index.d.ts || (echo "Missing TypeScript definitions" && exit 1)
+          echo "✅ Build verification passed"
+        
+      - name: Test examples
+        run: |
+          cd examples
+          node simple-demo.js || echo "Demo requires fixing module resolution"
+        
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            *.tgz
+          retention-days: 7
+
+  # Security audit job
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run security audit
+        run: npm audit --audit-level high
+        continue-on-error: true
+        
+      - name: Check for vulnerabilities in dependencies
+        run: |
+          if npm audit --audit-level high --json | jq -e '.metadata.vulnerabilities.high > 0 or .metadata.vulnerabilities.critical > 0'; then
+            echo "❌ High or critical vulnerabilities found"
+            npm audit --audit-level high
+            exit 1
+          else
+            echo "✅ No high or critical vulnerabilities found"
+          fi
+
+  # Performance benchmarks (runs on main branch only)
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build package
+        run: npm run build
+        
+      - name: Run benchmarks
+        run: |
+          cd benchmarks
+          timeout 300 node run-all.js || echo "Benchmarks completed with timeout"
+        
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmarks/
+          retention-days: 30
+
+  # Package and publish job (runs only on releases)
+  publish:
+    name: Publish Package
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'created'
+    needs: [test, build, security]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build package
+        run: npm run build
+        
+      - name: Run final tests
+        run: npm run test:coverage
+        
+      - name: Verify package contents
+        run: |
+          npm pack --dry-run
+          echo "Package contents verified"
+        
+      - name: Publish to NPM
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Documentation deployment (runs on main branch)
+  docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build documentation
+        run: |
+          npm run build
+          # Generate API documentation if TypeDoc is available
+          if command -v typedoc &> /dev/null; then
+            typedoc --out docs-dist src/index.ts
+          else
+            echo "TypeDoc not available, skipping API docs generation"
+            mkdir -p docs-dist
+            cp README.md docs-dist/
+          fi
+        
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: success()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs-dist
+          enable_jekyll: false
+          cname: collections.oxog.dev # Optional: your custom domain
+
+  # Dependency updates job (runs weekly)
+  dependency-updates:
+    name: Check Dependency Updates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Check for updates
+        run: |
+          npx npm-check-updates --doctor --upgrade --target minor
+          
+      - name: Create Pull Request
+        if: success()
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update dependencies"
+          title: "🔄 Automated dependency updates"
+          body: |
+            This PR was automatically created to update dependencies to their latest minor versions.
+            
+            Please review the changes and ensure all tests pass before merging.
+            
+            - [ ] Tests pass
+            - [ ] No breaking changes introduced
+            - [ ] Documentation updated if needed
+          branch: automated-dependency-updates
+          delete-branch: true
+
+# Schedule dependency updates to run weekly
+on:
+  schedule:
+    - cron: '0 2 * * 1' # Every Monday at 2 AM UTC

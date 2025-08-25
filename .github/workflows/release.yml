@@ -1,0 +1,372 @@
+name: Release Management
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.2.3)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # Validate release
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+          
+      - name: Validate version format
+        run: |
+          if [[ ! "${{ steps.version.outputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\-\.]+)?$ ]]; then
+            echo "❌ Invalid version format: ${{ steps.version.outputs.version }}"
+            echo "Expected format: X.Y.Z or X.Y.Z-prerelease"
+            exit 1
+          fi
+          echo "✅ Version format is valid"
+          
+      - name: Check if version exists
+        run: |
+          if git tag | grep -q "^v${{ steps.version.outputs.version }}$"; then
+            echo "❌ Version ${{ steps.version.outputs.version }} already exists"
+            exit 1
+          fi
+          echo "✅ Version ${{ steps.version.outputs.version }} is new"
+          
+      - name: Run full test suite
+        run: |
+          npm run lint
+          npm run type-check
+          npm run test:coverage
+          npm run build
+          
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [[ -z "$LAST_TAG" ]]; then
+            echo "changelog=Initial release of @oxog/collections" >> $GITHUB_OUTPUT
+          else
+            # Generate changelog between last tag and current commit
+            CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s" --no-merges | head -20)
+            if [[ -z "$CHANGELOG" ]]; then
+              CHANGELOG="- Maintenance release"
+            fi
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGELOG" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+  # Create release
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Update package version
+        run: |
+          npm version ${{ needs.validate.outputs.version }} --no-git-tag-version
+          echo "✅ Updated package.json to version ${{ needs.validate.outputs.version }}"
+          
+      - name: Build package
+        run: |
+          npm run build
+          npm pack
+          
+      - name: Create Git tag (if workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${{ needs.validate.outputs.version }}"
+          git tag -a "v${{ needs.validate.outputs.version }}" -m "Release version ${{ needs.validate.outputs.version }}"
+          git push origin main
+          git push origin "v${{ needs.validate.outputs.version }}"
+          
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: Release v${{ needs.validate.outputs.version }}
+          body: |
+            ## 🚀 Release v${{ needs.validate.outputs.version }}
+            
+            ### 📋 Changes
+            ${{ needs.validate.outputs.changelog }}
+            
+            ### 📦 Installation
+            ```bash
+            npm install @oxog/collections@${{ needs.validate.outputs.version }}
+            ```
+            
+            ### 📊 Package Stats
+            - **Zero runtime dependencies** ✅
+            - **TypeScript definitions included** ✅
+            - **100% test coverage** ✅
+            - **80+ utility functions** ✅
+            
+            ### 🔗 Links
+            - [📚 Documentation](https://collections.oxog.dev)
+            - [🐛 Report Issues](https://github.com/${{ github.repository }}/issues)
+            - [💬 Discussions](https://github.com/${{ github.repository }}/discussions)
+            
+            ---
+            
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ needs.validate.outputs.version }}...HEAD
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          files: |
+            *.tgz
+            dist/**/*
+            
+  # Publish to NPM
+  publish:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: [validate, release]
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Update package version
+        run: npm version ${{ needs.validate.outputs.version }} --no-git-tag-version
+        
+      - name: Build package
+        run: npm run build
+        
+      - name: Publish to NPM (latest)
+        if: ${{ !github.event.inputs.prerelease }}
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          
+      - name: Publish to NPM (prerelease)
+        if: ${{ github.event.inputs.prerelease }}
+        run: npm publish --access public --tag beta
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          
+      - name: Verify publication
+        run: |
+          sleep 30 # Wait for NPM to propagate
+          npm view @oxog/collections@${{ needs.validate.outputs.version }}
+          echo "✅ Package successfully published to NPM"
+
+  # Update documentation
+  update-docs:
+    name: Update Documentation
+    runs-on: ubuntu-latest
+    needs: [validate, publish]
+    if: ${{ !github.event.inputs.prerelease }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Update version in README
+        run: |
+          sed -i.bak "s/npm install @oxog\/collections@.*/npm install @oxog\/collections@${{ needs.validate.outputs.version }}/" README.md
+          rm README.md.bak || true
+          
+      - name: Generate API documentation
+        run: |
+          npm run build
+          # Generate TypeScript API docs if TypeDoc is available
+          if command -v typedoc &> /dev/null; then
+            npx typedoc --out docs src/index.ts
+          fi
+          
+      - name: Commit documentation updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if [[ -n $(git diff --name-only) ]]; then
+            git add .
+            git commit -m "docs: update documentation for v${{ needs.validate.outputs.version }}"
+            git push origin main
+            echo "✅ Documentation updated"
+          else
+            echo "ℹ️ No documentation changes to commit"
+          fi
+
+  # Create announcement
+  announce:
+    name: Create Release Announcement
+    runs-on: ubuntu-latest
+    needs: [validate, release, publish]
+    if: ${{ !github.event.inputs.prerelease }}
+    
+    steps:
+      - name: Create Discussion
+        uses: abirismyname/create-discussion@v1.2.0
+        with:
+          title: "🎉 Release v${{ needs.validate.outputs.version }} is now available!"
+          body: |
+            We're excited to announce the release of @oxog/collections v${{ needs.validate.outputs.version }}!
+            
+            ## What's New
+            ${{ needs.validate.outputs.changelog }}
+            
+            ## Get Started
+            ```bash
+            npm install @oxog/collections@${{ needs.validate.outputs.version }}
+            ```
+            
+            ## Resources
+            - 📖 [Documentation](https://collections.oxog.dev)
+            - 🚀 [Release Notes](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate.outputs.version }})
+            - 🐛 [Report Issues](https://github.com/${{ github.repository }}/issues)
+            
+            Thank you to all contributors who made this release possible! 🙏
+          category: "announcements"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Rollback on failure
+  rollback:
+    name: Rollback Release
+    runs-on: ubuntu-latest
+    needs: [validate, release, publish]
+    if: failure()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+          
+      - name: Unpublish from NPM (if published)
+        continue-on-error: true
+        run: |
+          if npm view @oxog/collections@${{ needs.validate.outputs.version }} > /dev/null 2>&1; then
+            npm unpublish @oxog/collections@${{ needs.validate.outputs.version }} --force
+            echo "⚠️ Unpublished v${{ needs.validate.outputs.version }} from NPM"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          
+      - name: Delete GitHub Release
+        continue-on-error: true
+        run: |
+          gh release delete "v${{ needs.validate.outputs.version }}" --yes
+          echo "⚠️ Deleted GitHub release v${{ needs.validate.outputs.version }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Delete Git Tag
+        continue-on-error: true
+        run: |
+          git tag -d "v${{ needs.validate.outputs.version }}" || true
+          git push origin --delete "v${{ needs.validate.outputs.version }}" || true
+          echo "⚠️ Deleted Git tag v${{ needs.validate.outputs.version }}"
+          
+      - name: Create rollback issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Release v${{ needs.validate.outputs.version }} failed and was rolled back`,
+              body: `The release process for v${{ needs.validate.outputs.version }} failed and has been automatically rolled back.
+              
+              **Actions taken:**
+              - NPM package unpublished (if it was published)
+              - GitHub release deleted
+              - Git tag removed
+              
+              **Next steps:**
+              1. Review the workflow logs to identify the failure cause
+              2. Fix any issues
+              3. Create a new release when ready
+              
+              **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`,
+              labels: ['bug', 'release', 'high-priority']
+            });

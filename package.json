@@ -1,0 +1,133 @@
+{
+  "name": "@oxog/collections",
+  "version": "1.0.0",
+  "description": "Zero-dependency, high-performance, type-safe collection utilities",
+  "keywords": [
+    "collections",
+    "utilities",
+    "functional",
+    "array",
+    "object",
+    "set",
+    "typescript",
+    "zero-dependency",
+    "performance"
+  ],
+  "author": "Ersin Koc",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./array": {
+      "require": "./dist/core/array/index.js",
+      "import": "./dist/core/array/index.mjs",
+      "types": "./dist/core/array/index.d.ts"
+    },
+    "./object": {
+      "require": "./dist/core/object/index.js",
+      "import": "./dist/core/object/index.mjs",
+      "types": "./dist/core/object/index.d.ts"
+    },
+    "./set": {
+      "require": "./dist/core/set/index.js",
+      "import": "./dist/core/set/index.mjs",
+      "types": "./dist/core/set/index.d.ts"
+    },
+    "./functional": {
+      "require": "./dist/core/functional/index.js",
+      "import": "./dist/core/functional/index.mjs",
+      "types": "./dist/core/functional/index.d.ts"
+    },
+    "./async": {
+      "require": "./dist/core/async/index.js",
+      "import": "./dist/core/async/index.mjs",
+      "types": "./dist/core/async/index.d.ts"
+    },
+    "./tree": {
+      "require": "./dist/core/tree/index.js",
+      "import": "./dist/core/tree/index.mjs",
+      "types": "./dist/core/tree/index.d.ts"
+    },
+    "./plugins": {
+      "require": "./dist/plugins/index.js",
+      "import": "./dist/plugins/index.mjs",
+      "types": "./dist/plugins/index.d.ts"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "npm run clean && npm run build:cjs && npm run build:esm && npm run build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json && npm run rename:esm",
+    "build:types": "tsc -p tsconfig.types.json",
+    "rename:esm": "node scripts/rename-esm.js",
+    "clean": "rm -rf dist coverage",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage && npm run validate:coverage",
+    "validate:coverage": "node scripts/validate-coverage.js",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "benchmark": "ts-node benchmarks/index.ts",
+    "benchmark:ci": "ts-node benchmarks/ci.ts",
+    "type-check": "tsc --noEmit",
+    "validate": "npm run lint && npm run type-check && npm run test:coverage",
+    "prepublishOnly": "npm run validate && npm run build",
+    "prepare": "husky install",
+    "release": "npm run validate && npm run build && npm publish --access public",
+    "release:beta": "npm run validate && npm run build && npm publish --tag beta --access public",
+    "docs:generate": "typedoc --out docs/api src/index.ts",
+    "security:audit": "npm audit --production",
+    "size": "size-limit",
+    "analyze": "source-map-explorer dist/**/*.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oxog/collections.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oxog/collections/issues"
+  },
+  "homepage": "https://github.com/oxog/collections#readme",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-jest": "^27.0.0",
+    "husky": "^8.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.0",
+    "size-limit": "^10.0.0",
+    "source-map-explorer": "^2.5.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "typedoc": "^0.25.0",
+    "typescript": "^5.2.0"
+  },
+  "size-limit": [
+    {
+      "path": "dist/index.js",
+      "limit": "50 KB"
+    }
+  ]
+}
