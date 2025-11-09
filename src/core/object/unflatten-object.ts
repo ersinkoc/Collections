@@ -33,10 +33,21 @@ export function unflattenObject(
   const { delimiter = '.' } = options;
   const result: Record<string, unknown> = {};
 
+  // Validate against prototype pollution
+  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+
   for (const flatKey in source) {
     if (!Object.prototype.hasOwnProperty.call(source, flatKey)) continue;
 
     const keys = flatKey.split(delimiter);
+
+    // Check for dangerous keys in path
+    for (const key of keys) {
+      if (dangerousKeys.includes(key)) {
+        throw new Error(`Unsafe property name detected: ${key}`);
+      }
+    }
+
     let current: any = result;
 
     for (let i = 0; i < keys.length - 1; i++) {

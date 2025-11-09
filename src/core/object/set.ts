@@ -60,6 +60,15 @@ export function set<T extends object>(
     return obj;
   }
 
+  // Validate against prototype pollution
+  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+  for (const key of pathArray) {
+    const keyStr = String(key);
+    if (dangerousKeys.includes(keyStr)) {
+      throw new Error(`Unsafe property name detected: ${keyStr}`);
+    }
+  }
+
   let current: any = obj;
 
   // Navigate to the parent of the target property

@@ -32,10 +32,12 @@ export function findInTree<T>(
   }
 
   const queue: TreeNode<T>[] = [root];
+  let queueIndex = 0;
 
-  while (queue.length > 0) {
-    const node = queue.shift()!;
-    
+  // Use index-based iteration instead of shift() for O(n) performance
+  while (queueIndex < queue.length) {
+    const node = queue[queueIndex++]!;
+
     if (predicate(node)) {
       return node;
     }
