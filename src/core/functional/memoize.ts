@@ -44,13 +44,30 @@ export function memoize<T extends unknown[], R>(
   const cache = new Map<string, R>();
 
   const memoized = (...args: T): R => {
-    const key = keyGenerator(...args);
+    let key: string;
+    try {
+      key = keyGenerator(...args);
+    } catch (error) {
+      // If key generation fails (e.g., circular reference in JSON.stringify),
+      // execute function without caching
+      return fn(...args);
+    }
 
     if (cache.has(key)) {
       return cache.get(key)!;
     }
 
     const result = fn(...args);
+
+    // Handle async functions (Promises) specially
+    if (result instanceof Promise) {
+      // For promises, handle rejection by removing from cache
+      const promiseResult = result as unknown as Promise<unknown>;
+      promiseResult.catch(() => {
+        // Remove from cache if promise rejects
+        cache.delete(key);
+      });
+    }
 
     if (cache.size >= maxSize) {
       // Remove the first (oldest) entry

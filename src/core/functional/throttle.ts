@@ -22,19 +22,42 @@ import { validateFunction, validateNonNegativeInteger } from '../../utils/valida
 export function throttle<T extends unknown[], R>(
   fn: (...args: T) => R,
   limit: number
-): (...args: T) => void {
+): ((...args: T) => void) & { cancel: () => void } {
   validateFunction(fn, 'fn');
   validateNonNegativeInteger(limit, 'limit');
 
   let inThrottle = false;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  return (...args: T): void => {
+  const throttledFn = (...args: T): void => {
     if (!inThrottle) {
-      fn(...args);
-      inThrottle = true;
-      setTimeout(() => {
+      try {
+        fn(...args);
+      } catch (error) {
+        // Reset throttle state on error to allow retry
         inThrottle = false;
+        if (timeoutId !== null) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        throw error;
+      }
+      inThrottle = true;
+      timeoutId = setTimeout(() => {
+        inThrottle = false;
+        timeoutId = null;
       }, limit);
     }
   };
+
+  // Cancel throttle and reset state
+  throttledFn.cancel = () => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    inThrottle = false;
+  };
+
+  return throttledFn;
 }
