@@ -27,6 +27,7 @@ export function reverse(str: string): string {
     return str;
   }
 
-  // Convert to array, reverse, and join back
-  return str.split('').reverse().join('');
+  // Use Array.from to properly handle Unicode code points (surrogate pairs, emojis, etc.)
+  // This correctly handles multi-byte characters unlike split('')
+  return Array.from(str).reverse().join('');
 }

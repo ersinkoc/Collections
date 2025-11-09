@@ -135,11 +135,11 @@ describe('maxBy', () => {
   });
 
   it('should throw ValidationError for non-array input', () => {
-    expect(() => maxBy('not array' as any, x => x)).toThrow(ValidationError);
-    expect(() => maxBy(null as any, x => x)).toThrow(ValidationError);
-    expect(() => maxBy(undefined as any, x => x)).toThrow(ValidationError);
-    expect(() => maxBy(123 as any, x => x)).toThrow(ValidationError);
-    expect(() => maxBy({} as any, x => x)).toThrow(ValidationError);
+    expect(() => maxBy('not array' as any, (x: any) => x as number)).toThrow(ValidationError);
+    expect(() => maxBy(null as any, (x: any) => x as number)).toThrow(ValidationError);
+    expect(() => maxBy(undefined as any, (x: any) => x as number)).toThrow(ValidationError);
+    expect(() => maxBy(123 as any, (x: any) => x as number)).toThrow(ValidationError);
+    expect(() => maxBy({} as any, (x: any) => x as number)).toThrow(ValidationError);
   });
 
   it('should throw ValidationError for non-function selector', () => {

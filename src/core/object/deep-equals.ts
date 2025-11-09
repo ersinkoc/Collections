@@ -15,7 +15,13 @@
  * @since 1.0.0
  */
 export function deepEquals(a: unknown, b: unknown): boolean {
+  // Handle strict equality
   if (a === b) return true;
+
+  // Handle NaN (NaN !== NaN, but we want them to be equal)
+  if (typeof a === 'number' && typeof b === 'number') {
+    if (Number.isNaN(a) && Number.isNaN(b)) return true;
+  }
 
   if (a === null || b === null) return false;
   if (a === undefined || b === undefined) return false;
@@ -44,11 +50,18 @@ export function deepEquals(a: unknown, b: unknown): boolean {
     return a.source === b.source && a.flags === b.flags;
   }
 
-  // Handle Set
+  // Handle Set with deep comparison
   if (a instanceof Set && b instanceof Set) {
     if (a.size !== b.size) return false;
-    for (const value of a) {
-      if (!b.has(value)) return false;
+    for (const valueA of a) {
+      let found = false;
+      for (const valueB of b) {
+        if (deepEquals(valueA, valueB)) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
     }
     return true;
   }
@@ -72,8 +85,10 @@ export function deepEquals(a: unknown, b: unknown): boolean {
 
     if (aKeys.length !== bKeys.length) return false;
 
+    // Use Set for O(1) lookup instead of O(n) includes
+    const bKeySet = new Set(bKeys);
     for (const key of aKeys) {
-      if (!bKeys.includes(key)) return false;
+      if (!bKeySet.has(key)) return false;
       if (!deepEquals(aObj[key], bObj[key])) return false;
     }
 

@@ -25,7 +25,15 @@ import { validateString } from '../../utils/validators';
 export function padStart(str: string, length: number, chars: string = ' '): string {
   validateString(str, 'str');
 
-  if (length <= str.length) {
+  // Validate length parameter to prevent Infinity and NaN
+  if (!Number.isFinite(length)) {
+    throw new Error('length must be a finite number');
+  }
+
+  // Use Array.from to get actual character count for Unicode support
+  const actualLength = Array.from(str).length;
+
+  if (length <= actualLength) {
     return str;
   }
 
@@ -33,7 +41,7 @@ export function padStart(str: string, length: number, chars: string = ' '): stri
     return str;
   }
 
-  const padLength = length - str.length;
+  const padLength = length - actualLength;
   
   // Repeat chars to cover the needed padding length
   let padding = '';

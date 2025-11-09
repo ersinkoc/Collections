@@ -135,11 +135,11 @@ describe('minBy', () => {
   });
 
   it('should throw ValidationError for non-array input', () => {
-    expect(() => minBy('not array' as any, x => x)).toThrow(ValidationError);
-    expect(() => minBy(null as any, x => x)).toThrow(ValidationError);
-    expect(() => minBy(undefined as any, x => x)).toThrow(ValidationError);
-    expect(() => minBy(123 as any, x => x)).toThrow(ValidationError);
-    expect(() => minBy({} as any, x => x)).toThrow(ValidationError);
+    expect(() => minBy('not array' as any, (x: any) => x as number)).toThrow(ValidationError);
+    expect(() => minBy(null as any, (x: any) => x as number)).toThrow(ValidationError);
+    expect(() => minBy(undefined as any, (x: any) => x as number)).toThrow(ValidationError);
+    expect(() => minBy(123 as any, (x: any) => x as number)).toThrow(ValidationError);
+    expect(() => minBy({} as any, (x: any) => x as number)).toThrow(ValidationError);
   });
 
   it('should throw ValidationError for non-function selector', () => {

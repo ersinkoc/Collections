@@ -195,7 +195,7 @@ describe('union', () => {
       
       for (const [sizeA, sizeB] of sizes) {
         const setA = new Set(Array.from({ length: sizeA } as ArrayLike<unknown>, (_, i) => i));
-        const setB = new Set(Array.from({ length: sizeB } as ArrayLike<unknown>, (_, i) => i + sizeA));
+        const setB = new Set(Array.from({ length: sizeB } as ArrayLike<unknown>, (_, i) => i + sizeA!));
         const start = performance.now();
         union(setA, setB);
         const end = performance.now();
