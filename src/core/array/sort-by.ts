@@ -47,19 +47,24 @@ export function sortBy<T>(
     });
   } else {
     const valueSelector = selector as Selector<T, number | string>;
-    result.sort((a, b) => {
-      const aValue = valueSelector(a, 0, array);
-      const bValue = valueSelector(b, 0, array);
-      
+    // Create array with original indices to pass correct index to selector
+    const indexed = result.map((item, index) => ({ item, index }));
+
+    indexed.sort((a, b) => {
+      const aValue = valueSelector(a.item, a.index, array);
+      const bValue = valueSelector(b.item, b.index, array);
+
       let compareResult: number;
       if (typeof aValue === 'number' && typeof bValue === 'number') {
         compareResult = aValue - bValue;
       } else {
         compareResult = String(aValue).localeCompare(String(bValue));
       }
-      
+
       return descending ? -compareResult : compareResult;
     });
+
+    return indexed.map(({ item }) => item);
   }
 
   return result;

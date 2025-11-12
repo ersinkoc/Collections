@@ -38,8 +38,12 @@ export function debounce<T extends unknown[], R>(
 
     timeoutId = setTimeout(() => {
       if (lastArgs !== null) {
-        fn(...lastArgs);
-        lastArgs = null;
+        try {
+          fn(...lastArgs);
+        } finally {
+          // Always clear lastArgs even if fn throws, to prevent memory leak
+          lastArgs = null;
+        }
       }
       timeoutId = null;
     }, delay);
@@ -58,9 +62,13 @@ export function debounce<T extends unknown[], R>(
   debouncedFn.flush = () => {
     if (timeoutId !== null && lastArgs !== null) {
       clearTimeout(timeoutId);
-      fn(...lastArgs);
-      timeoutId = null;
-      lastArgs = null;
+      try {
+        fn(...lastArgs);
+      } finally {
+        // Always clear state even if fn throws, to prevent memory leak
+        timeoutId = null;
+        lastArgs = null;
+      }
     }
   };
 

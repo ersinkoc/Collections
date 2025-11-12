@@ -3,12 +3,12 @@ import { validateFunction } from '../../utils/validators';
 
 /**
  * Gets the path from root to a node matching a predicate.
- * 
+ *
  * @param root - Root node to search from
  * @param predicate - Function to test each node
  * @returns Array of nodes from root to target, or empty array if not found
  * @throws {ValidationError} When predicate is not a function
- * 
+ *
  * @example
  * ```typescript
  * const tree = createTreeNode('root', [
@@ -19,7 +19,8 @@ import { validateFunction } from '../../utils/validators';
  * getPathToNode(tree, node => node.data === 'target');
  * // Returns: [rootNode, childNode, targetNode]
  * ```
- * 
+ *
+ * @note Handles circular references safely - cycles are detected and skipped
  * @complexity O(n) - Where n is the number of nodes (worst case)
  * @since 1.0.0
  */
@@ -33,7 +34,15 @@ export function getPathToNode<T>(
     return [];
   }
 
+  const visited = new WeakSet<TreeNode<T>>();
+
   const findPath = (node: TreeNode<T>, path: TreeNode<T>[]): TreeNode<T>[] | null => {
+    // Detect circular references
+    if (visited.has(node)) {
+      return null;
+    }
+    visited.add(node);
+
     const currentPath = [...path, node];
 
     if (predicate(node)) {
