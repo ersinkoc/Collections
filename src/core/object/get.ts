@@ -56,6 +56,15 @@ export function get<T = any>(
     pathArray = path;
   }
 
+  // Security: Validate against dangerous property access
+  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+  for (const key of pathArray) {
+    const keyStr = String(key);
+    if (dangerousKeys.includes(keyStr)) {
+      throw new Error(`Unsafe property name detected: ${keyStr}`);
+    }
+  }
+
   let current = obj;
 
   for (const key of pathArray) {
@@ -64,7 +73,7 @@ export function get<T = any>(
     }
 
     current = current[key];
-    
+
     if (current === undefined) {
       return defaultValue;
     }
