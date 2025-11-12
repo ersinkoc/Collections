@@ -9,19 +9,24 @@ export interface FlattenOptions {
 }
 
 /**
- * Flattens a nested object into a single-level object.
- * 
+ * Flattens a nested object into a single-level object with circular reference detection.
+ *
  * @param source - The object to flatten
  * @param options - Flattening options
  * @returns Flattened object with concatenated keys
  * @throws {ValidationError} When source is not an object
- * 
+ *
  * @example
  * ```typescript
  * flattenObject({ a: { b: { c: 1 } }, d: 2 });
  * // Returns: { 'a.b.c': 1, d: 2 }
+ *
+ * // Handles circular references
+ * const obj: any = { a: 1, nested: { b: 2 } };
+ * obj.nested.circular = obj;
+ * flattenObject(obj); // Returns: { a: 1, 'nested.b': 2, 'nested.circular': '[Circular]' }
  * ```
- * 
+ *
  * @complexity O(n) - Where n is total number of properties
  * @since 1.0.0
  */
@@ -33,8 +38,16 @@ export function flattenObject(
 
   const { delimiter = '.', maxDepth = Infinity } = options;
   const result: Record<string, unknown> = {};
+  const seen = new WeakSet<object>();
 
   function flatten(obj: Record<string, unknown>, prefix: string = '', depth: number = 0): void {
+    // Detect circular reference
+    if (seen.has(obj)) {
+      result[prefix || 'circular'] = '[Circular]';
+      return;
+    }
+    seen.add(obj);
+
     for (const key in obj) {
       if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
 

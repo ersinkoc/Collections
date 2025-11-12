@@ -56,6 +56,15 @@ export function unset<T extends object>(
     return false;
   }
 
+  // Security: Validate against prototype pollution
+  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+  for (const key of pathArray) {
+    const keyStr = String(key);
+    if (dangerousKeys.includes(keyStr)) {
+      throw new Error(`Unsafe property name detected: ${keyStr}`);
+    }
+  }
+
   // Special case for single-level path
   if (pathArray.length === 1) {
     const key = pathArray[0]!;

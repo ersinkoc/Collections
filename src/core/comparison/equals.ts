@@ -1,20 +1,32 @@
 /**
- * Deep equality check for any values.
- * 
+ * Deep equality check for any values with circular reference detection.
+ *
  * @param a - First value
  * @param b - Second value
+ * @param seenPairs - WeakMap to track compared pairs (internal use)
  * @returns True if values are deeply equal
- * 
+ *
  * @example
  * ```typescript
  * equals([1, 2, { a: 3 }], [1, 2, { a: 3 }]);
  * // Returns: true
+ *
+ * // Handles circular references
+ * const a: any = { x: 1 };
+ * a.self = a;
+ * const b: any = { x: 1 };
+ * b.self = b;
+ * equals(a, b); // Returns: true without stack overflow
  * ```
- * 
+ *
  * @complexity O(n) - Where n is total number of properties/elements
  * @since 1.0.0
  */
-export function equals(a: unknown, b: unknown): boolean {
+export function equals(
+  a: unknown,
+  b: unknown,
+  seenPairs: WeakMap<object, Set<object>> = new WeakMap()
+): boolean {
   if (a === b) return true;
 
   if (a === null || b === null) return false;
@@ -22,11 +34,28 @@ export function equals(a: unknown, b: unknown): boolean {
 
   if (typeof a !== typeof b) return false;
 
+  // Check for circular references for objects
+  if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
+    const aObj = a as object;
+    const bObj = b as object;
+
+    // Check if we've already compared this pair
+    if (seenPairs.has(aObj)) {
+      const compared = seenPairs.get(aObj)!;
+      if (compared.has(bObj)) {
+        return true; // Assume equal if we're in a cycle
+      }
+    } else {
+      seenPairs.set(aObj, new Set());
+    }
+    seenPairs.get(aObj)!.add(bObj);
+  }
+
   // Handle arrays
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
-      if (!equals(a[i], b[i])) return false;
+      if (!equals(a[i], b[i], seenPairs)) return false;
     }
     return true;
   }
@@ -44,11 +73,18 @@ export function equals(a: unknown, b: unknown): boolean {
     return a.source === b.source && a.flags === b.flags;
   }
 
-  // Handle Set
+  // Handle Set - use deep equality for Set members
   if (a instanceof Set && b instanceof Set) {
     if (a.size !== b.size) return false;
-    for (const value of a) {
-      if (!b.has(value)) return false;
+    for (const valueA of a) {
+      let found = false;
+      for (const valueB of b) {
+        if (equals(valueA, valueB, seenPairs)) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
     }
     return true;
   }
@@ -57,7 +93,15 @@ export function equals(a: unknown, b: unknown): boolean {
   if (a instanceof Map && b instanceof Map) {
     if (a.size !== b.size) return false;
     for (const [key, value] of a) {
-      if (!b.has(key) || !equals(value, b.get(key))) return false;
+      // For Map keys, we need deep equality as well
+      let keyFound = false;
+      for (const [bKey, bValue] of b) {
+        if (equals(key, bKey, seenPairs) && equals(value, bValue, seenPairs)) {
+          keyFound = true;
+          break;
+        }
+      }
+      if (!keyFound) return false;
     }
     return true;
   }
@@ -72,9 +116,11 @@ export function equals(a: unknown, b: unknown): boolean {
 
     if (aKeys.length !== bKeys.length) return false;
 
+    // Use Set for O(1) lookup instead of O(n) includes
+    const bKeySet = new Set(bKeys);
     for (const key of aKeys) {
-      if (!bKeys.includes(key)) return false;
-      if (!equals(aObj[key], bObj[key])) return false;
+      if (!bKeySet.has(key)) return false;
+      if (!equals(aObj[key], bObj[key], seenPairs)) return false;
     }
 
     return true;

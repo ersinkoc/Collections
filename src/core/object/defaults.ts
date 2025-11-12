@@ -26,8 +26,16 @@ export function defaults<T extends Record<string, unknown>, D extends Record<str
 
   const result = { ...source } as T & D;
 
+  // Security: Validate against prototype pollution
+  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+
   for (const key in defaultValues) {
     if (Object.prototype.hasOwnProperty.call(defaultValues, key)) {
+      // Check for dangerous keys
+      if (dangerousKeys.includes(key)) {
+        throw new Error(`Unsafe property name detected: ${key}`);
+      }
+
       if (!(key in result) || result[key] === undefined) {
         (result as any)[key] = defaultValues[key];
       }
