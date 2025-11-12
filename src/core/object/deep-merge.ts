@@ -1,4 +1,5 @@
 import { validateObject } from '../../utils/validators';
+import { deepClone } from './deep-clone';
 
 /**
  * Checks if a value is a plain object
@@ -7,7 +8,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  
+
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
@@ -95,8 +96,14 @@ function deepMergeWithRefs<T = any>(
         seen.set(sourceValue, merged);
         result[key] = merged;
       } else {
-        // For non-objects (including arrays), simply assign
-        result[key] = sourceValue;
+        // For non-plain-objects (including arrays, Date, RegExp, etc.),
+        // deep clone to prevent shared references
+        if (typeof sourceValue === 'object' && sourceValue !== null) {
+          result[key] = deepClone(sourceValue);
+        } else {
+          // Primitive values can be assigned directly
+          result[key] = sourceValue;
+        }
       }
     }
   }

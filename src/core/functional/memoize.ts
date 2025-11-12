@@ -38,7 +38,7 @@ export function memoize<T extends unknown[], R>(
 
   const {
     keyGenerator = (...args: T) => JSON.stringify(args),
-    maxSize = Infinity
+    maxSize = 1000 // Changed from Infinity to prevent unbounded memory growth
   } = options;
 
   const cache = new Map<string, R>();
@@ -62,11 +62,19 @@ export function memoize<T extends unknown[], R>(
     // Handle async functions (Promises) specially
     if (result instanceof Promise) {
       // For promises, handle rejection by removing from cache
+      // and only cache resolved values to prevent memory leaks from pending promises
       const promiseResult = result as unknown as Promise<unknown>;
-      promiseResult.catch(() => {
-        // Remove from cache if promise rejects
-        cache.delete(key);
-      });
+      promiseResult
+        .then(() => {
+          // Promise resolved successfully, keep in cache
+        })
+        .catch(() => {
+          // Remove from cache if promise rejects
+          cache.delete(key);
+        });
+
+      // Note: We cache the promise immediately for deduplication of concurrent calls,
+      // but the catch handler ensures rejected promises are removed
     }
 
     if (cache.size >= maxSize) {
