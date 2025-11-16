@@ -68,5 +68,7 @@ export async function retry<T>(
     }
   }
 
+  // Unreachable: loop always returns or throws on last iteration
+  // Kept to satisfy TypeScript's control flow analysis
   throw lastError!;
 }

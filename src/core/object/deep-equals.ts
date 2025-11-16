@@ -98,9 +98,25 @@ export function deepEquals(
   // Handle Map
   if (a instanceof Map && b instanceof Map) {
     if (a.size !== b.size) return false;
-    for (const [key, value] of a) {
-      if (!b.has(key) || !deepEquals(value, b.get(key), seenPairs)) return false;
+
+    // Need to use deep equality for Map keys (not just reference equality)
+    for (const [aKey, aValue] of a) {
+      let found = false;
+
+      // Search for a matching key in b using deep equality
+      for (const [bKey, bValue] of b) {
+        if (deepEquals(aKey, bKey, seenPairs)) {
+          if (!deepEquals(aValue, bValue, seenPairs)) {
+            return false;  // Key matches but value doesn't
+          }
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) return false;  // No matching key found in b
     }
+
     return true;
   }
 

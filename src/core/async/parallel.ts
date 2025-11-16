@@ -74,17 +74,18 @@ export async function parallel<T>(
   let index = 0;
 
   const executeNext = async (): Promise<void> => {
-    const currentIndex = index++;
-    if (currentIndex >= tasks.length) return;
+    // Use while loop instead of recursion to prevent stack overflow
+    while (true) {
+      const currentIndex = index++;
+      if (currentIndex >= tasks.length) return;
 
-    try {
-      results[currentIndex] = await tasks[currentIndex]!();
-    } catch (error) {
-      results[currentIndex] = error as Error;
-      errors.push({ index: currentIndex, error });
+      try {
+        results[currentIndex] = await tasks[currentIndex]!();
+      } catch (error) {
+        results[currentIndex] = error as Error;
+        errors.push({ index: currentIndex, error });
+      }
     }
-
-    await executeNext();
   };
 
   const workers = Array(Math.min(concurrency, tasks.length))
