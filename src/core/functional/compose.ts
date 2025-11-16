@@ -32,12 +32,28 @@ export function compose<T>(...fns: Array<(arg: any) => any>): (arg: T) => any {
   }
 
   return (arg: T) => {
-    let result: any = fns[fns.length - 1]!(arg);
-    
-    for (let i = fns.length - 2; i >= 0; i--) {
-      result = fns[i]!(result);
+    let result: any;
+
+    // Start with the last function (right-to-left composition)
+    try {
+      result = fns[fns.length - 1]!(arg);
+    } catch (error) {
+      throw new Error(
+        `Error in composed function at position ${fns.length - 1} (rightmost): ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-    
+
+    // Apply remaining functions right-to-left
+    for (let i = fns.length - 2; i >= 0; i--) {
+      try {
+        result = fns[i]!(result);
+      } catch (error) {
+        throw new Error(
+          `Error in composed function at position ${i}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
     return result;
   };
 }

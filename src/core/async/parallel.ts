@@ -2,12 +2,14 @@ import { validateArray, validateFunction } from '../../utils/validators';
 
 /**
  * Executes async operations in parallel with optional concurrency limit.
- * 
+ * Uses Promise.allSettled to provide better error reporting with context about which tasks failed.
+ *
  * @param tasks - Array of async tasks to execute
  * @param concurrency - Maximum number of concurrent tasks (default: unlimited)
  * @returns Promise resolving to array of results
  * @throws {ValidationError} When tasks is not an array or concurrency is invalid
- * 
+ * @throws {Error} When any task fails, with details about which task indices failed
+ *
  * @example
  * ```typescript
  * const tasks = [
@@ -17,7 +19,7 @@ import { validateArray, validateFunction } from '../../utils/validators';
  * ];
  * await parallel(tasks, 2); // Max 2 concurrent requests
  * ```
- * 
+ *
  * @complexity O(n) - Where n is the number of tasks
  * @since 1.0.0
  */
@@ -26,7 +28,7 @@ export async function parallel<T>(
   concurrency?: number
 ): Promise<T[]> {
   validateArray(tasks, 'tasks');
-  
+
   if (concurrency !== undefined) {
     if (typeof concurrency !== 'number' || concurrency < 1 || !Number.isInteger(concurrency)) {
       throw new Error('concurrency must be a positive integer');
@@ -37,18 +39,51 @@ export async function parallel<T>(
     validateFunction(task, `tasks[${index}]`);
   });
 
+  // Unlimited concurrency path
   if (!concurrency || concurrency >= tasks.length) {
-    return Promise.all(tasks.map(task => task()));
+    const results = await Promise.allSettled(tasks.map(task => task()));
+
+    const errors: Array<{ index: number; error: any }> = [];
+    const values: T[] = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        errors.push({ index, error: result.reason });
+      } else {
+        values.push(result.value);
+      }
+    });
+
+    if (errors.length > 0) {
+      const errorIndices = errors.map(e => e.index).join(', ');
+      const errorMessages = errors.map(e =>
+        e.error instanceof Error ? e.error.message : String(e.error)
+      ).join('; ');
+
+      throw new Error(
+        `parallel execution failed at ${errors.length} task index(es) [${errorIndices}]: ${errorMessages}`
+      );
+    }
+
+    return values;
   }
 
-  const results: T[] = new Array(tasks.length);
+  // Limited concurrency path
+  const results: Array<T | Error> = new Array(tasks.length);
+  const errors: Array<{ index: number; error: any }> = [];
   let index = 0;
 
   const executeNext = async (): Promise<void> => {
     const currentIndex = index++;
     if (currentIndex >= tasks.length) return;
 
-    results[currentIndex] = await tasks[currentIndex]!();
+    try {
+      results[currentIndex] = await tasks[currentIndex]!();
+    } catch (error) {
+      results[currentIndex] = error as Error;
+      errors.push({ index: currentIndex, error });
+    }
+
     await executeNext();
   };
 
@@ -57,5 +92,17 @@ export async function parallel<T>(
     .map(() => executeNext());
 
   await Promise.all(workers);
-  return results;
+
+  if (errors.length > 0) {
+    const errorIndices = errors.map(e => e.index).join(', ');
+    const errorMessages = errors.map(e =>
+      e.error instanceof Error ? e.error.message : String(e.error)
+    ).join('; ');
+
+    throw new Error(
+      `parallel execution failed at ${errors.length} task index(es) [${errorIndices}]: ${errorMessages}`
+    );
+  }
+
+  return results as T[];
 }

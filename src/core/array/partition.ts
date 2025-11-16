@@ -30,7 +30,18 @@ export function partition<T>(
 
   for (let i = 0; i < array.length; i++) {
     const element = array[i]!;
-    if (predicate(element, i, array)) {
+    let result: boolean;
+
+    // Wrap predicate call to provide better error context
+    try {
+      result = predicate(element, i, array);
+    } catch (error) {
+      throw new Error(
+        `Error in predicate function at index ${i}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    if (result) {
       truthy.push(element);
     } else {
       falsy.push(element);

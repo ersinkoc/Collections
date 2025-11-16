@@ -28,8 +28,17 @@ export function mapNotNullish<T, R>(
   const result: R[] = [];
 
   for (let i = 0; i < array.length; i++) {
-    const mapped = mapper(array[i]!, i, array);
-    
+    let mapped: R | null | undefined;
+
+    // Wrap mapper call to provide better error context
+    try {
+      mapped = mapper(array[i]!, i, array);
+    } catch (error) {
+      throw new Error(
+        `Error in mapper function at index ${i}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
     if (mapped !== null && mapped !== undefined) {
       result.push(mapped as R);
     }

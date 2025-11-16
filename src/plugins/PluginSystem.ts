@@ -39,6 +39,10 @@ export class PluginSystem {
   private plugins = new Map<string, Plugin>();
   private functions = new Map<string, Function>();
   private eventListeners = new Map<string, Set<(...args: any[]) => void>>();
+  // Track listeners added by each plugin for cleanup on uninstall
+  private pluginListeners = new Map<string, Map<string, Set<(...args: any[]) => void>>>();
+  // Track which plugin is currently being installed (for listener attribution)
+  private currentlyInstallingPlugin: string | null = null;
 
   /**
    * Installs a plugin into the system.
@@ -82,10 +86,19 @@ export class PluginSystem {
 
     // Install the plugin
     plugin.config = config;
-    await plugin.install(this, config);
-    this.plugins.set(plugin.name, plugin);
 
-    this.emit('plugin:installed', plugin);
+    // Track which plugin is being installed so event listeners can be attributed to it
+    this.currentlyInstallingPlugin = plugin.name;
+    this.pluginListeners.set(plugin.name, new Map());
+
+    try {
+      await plugin.install(this, config);
+      this.plugins.set(plugin.name, plugin);
+      this.emit('plugin:installed', plugin);
+    } finally {
+      // Clear installation context even if install fails
+      this.currentlyInstallingPlugin = null;
+    }
   }
 
   /**
@@ -112,6 +125,24 @@ export class PluginSystem {
     // Uninstall the plugin
     if (plugin.uninstall) {
       await plugin.uninstall(this);
+    }
+
+    // Clean up all event listeners registered by this plugin
+    const pluginEventListeners = this.pluginListeners.get(name);
+    if (pluginEventListeners) {
+      for (const [event, listeners] of pluginEventListeners) {
+        const globalListeners = this.eventListeners.get(event);
+        if (globalListeners) {
+          for (const listener of listeners) {
+            globalListeners.delete(listener);
+          }
+          // Clean up empty event listener sets
+          if (globalListeners.size === 0) {
+            this.eventListeners.delete(event);
+          }
+        }
+      }
+      this.pluginListeners.delete(name);
     }
 
     this.plugins.delete(name);
@@ -222,7 +253,7 @@ export class PluginSystem {
 
   /**
    * Adds an event listener.
-   * 
+   *
    * @param event - Event name
    * @param listener - Event listener function
    */
@@ -235,11 +266,22 @@ export class PluginSystem {
     }
 
     this.eventListeners.get(event)!.add(listener);
+
+    // If a plugin is currently being installed, track this listener for cleanup on uninstall
+    if (this.currentlyInstallingPlugin) {
+      const pluginEventListeners = this.pluginListeners.get(this.currentlyInstallingPlugin);
+      if (pluginEventListeners) {
+        if (!pluginEventListeners.has(event)) {
+          pluginEventListeners.set(event, new Set());
+        }
+        pluginEventListeners.get(event)!.add(listener);
+      }
+    }
   }
 
   /**
    * Removes an event listener.
-   * 
+   *
    * @param event - Event name
    * @param listener - Event listener function to remove
    */
@@ -252,6 +294,17 @@ export class PluginSystem {
       listeners.delete(listener);
       if (listeners.size === 0) {
         this.eventListeners.delete(event);
+      }
+    }
+
+    // Also remove from plugin listener tracking
+    for (const [, pluginEventListeners] of this.pluginListeners) {
+      const pluginListenersForEvent = pluginEventListeners.get(event);
+      if (pluginListenersForEvent) {
+        pluginListenersForEvent.delete(listener);
+        if (pluginListenersForEvent.size === 0) {
+          pluginEventListeners.delete(event);
+        }
       }
     }
   }
