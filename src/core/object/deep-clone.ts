@@ -1,12 +1,9 @@
-import { validateDefined } from '../../utils/validators';
-
 /**
  * Creates a deep clone of a value with circular reference detection.
  *
  * @param value - The value to clone
  * @param seen - WeakMap to track circular references (internal use)
  * @returns Deep cloned value
- * @throws {ArgumentError} When value is undefined
  *
  * @example
  * ```typescript
@@ -19,13 +16,20 @@ import { validateDefined } from '../../utils/validators';
  * const circular: any = { a: 1 };
  * circular.self = circular;
  * const clonedCircular = deepClone(circular); // Works without stack overflow
+ *
+ * // Handles null and undefined
+ * deepClone(null); // null
+ * deepClone(undefined); // undefined
  * ```
  *
  * @complexity O(n) - Where n is total number of properties/elements
  * @since 1.0.0
  */
 export function deepClone<T>(value: T, seen: WeakMap<object, any> = new WeakMap()): T {
-  validateDefined(value, 'value');
+  // Handle undefined explicitly
+  if (value === undefined) {
+    return value;
+  }
 
   // Handle primitives and null
   if (value === null || typeof value !== 'object') {
@@ -47,11 +51,17 @@ export function deepClone<T>(value: T, seen: WeakMap<object, any> = new WeakMap(
     return new RegExp(value.source, value.flags) as T;
   }
 
-  // Handle Array
+  // Handle Array (preserving sparse array holes)
   if (Array.isArray(value)) {
-    const clonedArray: any[] = [];
+    const clonedArray: any[] = new Array(value.length);
     seen.set(value as object, clonedArray);
-    value.forEach(item => clonedArray.push(deepClone(item, seen)));
+    // Use for loop instead of forEach to preserve sparse array holes
+    for (let i = 0; i < value.length; i++) {
+      if (i in value) {
+        clonedArray[i] = deepClone(value[i], seen);
+      }
+      // Holes (indices not in array) are left undefined, preserving sparse structure
+    }
     return clonedArray as T;
   }
 
