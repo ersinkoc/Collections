@@ -36,12 +36,21 @@ export function groupBy<T, K extends string | number | symbol>(
   const result = {} as Record<K, T[]>;
 
   for (let i = 0; i < array.length; i++) {
-    const key = selector(array[i]!, i, array);
-    
+    let key: K;
+
+    // Wrap selector call to provide better error context
+    try {
+      key = selector(array[i]!, i, array);
+    } catch (error) {
+      throw new Error(
+        `Error in selector function at index ${i}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
     if (!(key in result)) {
       result[key] = [];
     }
-    
+
     result[key].push(array[i]!);
   }
 

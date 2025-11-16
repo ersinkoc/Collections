@@ -32,12 +32,28 @@ export function pipe<T>(...fns: Array<(arg: any) => any>): (arg: T) => any {
   }
 
   return (arg: T) => {
-    let result: any = fns[0]!(arg);
-    
-    for (let i = 1; i < fns.length; i++) {
-      result = fns[i]!(result);
+    let result: any;
+
+    // Start with the first function (left-to-right pipeline)
+    try {
+      result = fns[0]!(arg);
+    } catch (error) {
+      throw new Error(
+        `Error in piped function at position 0 (first): ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-    
+
+    // Apply remaining functions left-to-right
+    for (let i = 1; i < fns.length; i++) {
+      try {
+        result = fns[i]!(result);
+      } catch (error) {
+        throw new Error(
+          `Error in piped function at position ${i}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
     return result;
   };
 }

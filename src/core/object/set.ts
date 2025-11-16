@@ -48,9 +48,10 @@ export function set<T extends object>(
   if (typeof path === 'string') {
     // Handle dot notation, including array indices like 'a.0.b'
     pathArray = path.split('.').map(key => {
-      // Try to convert to number if it looks like an array index
+      // Try to convert to number only if it's a valid array index
+      // AND the string representation matches (prevents "01" -> 1 conversion)
       const num = Number(key);
-      return !isNaN(num) && Number.isInteger(num) && num >= 0 ? num : key;
+      return !isNaN(num) && Number.isInteger(num) && num >= 0 && String(num) === key ? num : key;
     });
   } else {
     pathArray = path;
