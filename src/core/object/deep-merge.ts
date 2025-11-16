@@ -96,10 +96,19 @@ function deepMergeWithRefs<T = any>(
         seen.set(sourceValue, merged);
         result[key] = merged;
       } else {
-        // For non-plain-objects (including arrays, Date, RegExp, etc.),
-        // deep clone to prevent shared references
+        // For non-plain-objects, handle based on type:
+        // - Arrays: deep clone to prevent shared references
+        // - Date/RegExp/Classes: preserve reference (standard JavaScript behavior)
+        // - Primitives: assign directly
         if (typeof sourceValue === 'object' && sourceValue !== null) {
-          result[key] = deepClone(sourceValue);
+          // Deep clone arrays to prevent shared mutations
+          if (Array.isArray(sourceValue)) {
+            result[key] = deepClone(sourceValue);
+          } else {
+            // Preserve reference for Date, RegExp, and class instances
+            // This matches standard JavaScript object spreading behavior
+            result[key] = sourceValue;
+          }
         } else {
           // Primitive values can be assigned directly
           result[key] = sourceValue;

@@ -29,10 +29,15 @@ export function invert<T extends Record<string, string | number>>(
     if (Object.prototype.hasOwnProperty.call(source, key)) {
       const value = source[key];
 
+      // Skip undefined values as they cannot be used as object keys
+      if (value === undefined) {
+        continue;
+      }
+
       // Check for duplicate values to prevent silent data loss
-      if (Object.prototype.hasOwnProperty.call(result, value)) {
+      if (Object.prototype.hasOwnProperty.call(result, value as PropertyKey)) {
         throw new Error(
-          `Duplicate value '${value}' found for keys '${result[value]}' and '${key}'. ` +
+          `Duplicate value '${String(value)}' found for keys '${String(result[value as PropertyKey])}' and '${key}'. ` +
           'Cannot invert object with duplicate values as this would cause data loss.'
         );
       }
