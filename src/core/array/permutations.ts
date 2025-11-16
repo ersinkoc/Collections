@@ -32,9 +32,14 @@ export function permutations<T>(array: T[]): T[][] {
 
   // Prevent memory exhaustion: 13! = 6.2 billion permutations
   if (array.length > 12) {
+    // Only calculate factorial for reasonable values to avoid stack overflow in error message
+    const permCount = array.length <= 20
+      ? `${factorial(array.length)} permutations`
+      : 'an extremely large number of permutations';
+
     throw new ValidationError(
       'Array length must not exceed 12 elements to prevent memory exhaustion. ' +
-      `Got ${array.length} elements, which would generate ${factorial(array.length)} permutations.`
+      `Got ${array.length} elements, which would generate ${permCount}.`
     );
   }
 

@@ -44,6 +44,11 @@ export function memoize<T extends unknown[], R>(
   const cache = new Map<string, R>();
 
   const memoized = (...args: T): R => {
+    // Don't cache if maxSize is 0 or negative
+    if (maxSize <= 0) {
+      return fn(...args);
+    }
+
     let key: string;
     try {
       key = keyGenerator(...args);

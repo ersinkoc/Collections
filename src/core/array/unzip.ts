@@ -7,6 +7,7 @@ import { validateArray } from '../../utils/validators';
  * @param array - Array of tuples to unzip
  * @returns Array of arrays where each contains elements from the same position
  * @throws {ValidationError} When array is not an array
+ * @throws {Error} When array contains non-array-like elements
  *
  * @example
  * ```typescript
@@ -30,8 +31,18 @@ export function unzip<T extends readonly unknown[]>(
     return [] as unknown as { [K in keyof T]: Array<T[K]> };
   }
 
-  // Find the maximum tuple length to avoid data loss
-  const maxTupleLength = Math.max(...array.map(tuple => tuple.length));
+  // Validate all elements are array-like and find maximum tuple length
+  let maxTupleLength = 0;
+  for (let i = 0; i < array.length; i++) {
+    const tuple = array[i];
+    if (!Array.isArray(tuple) && (!tuple || typeof tuple.length !== 'number')) {
+      throw new Error(
+        `Element at index ${i} is not array-like. Expected array or array-like object, got ${typeof tuple}`
+      );
+    }
+    maxTupleLength = Math.max(maxTupleLength, tuple.length);
+  }
+
   const result: unknown[][] = Array.from({ length: maxTupleLength }, () => []);
 
   for (const tuple of array) {

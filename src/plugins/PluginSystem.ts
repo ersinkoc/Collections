@@ -95,6 +95,25 @@ export class PluginSystem {
       await plugin.install(this, config);
       this.plugins.set(plugin.name, plugin);
       this.emit('plugin:installed', plugin);
+    } catch (error) {
+      // Clean up listeners added before the error to prevent memory leak
+      const pluginEventListeners = this.pluginListeners.get(plugin.name);
+      if (pluginEventListeners) {
+        for (const [event, listeners] of pluginEventListeners) {
+          const globalListeners = this.eventListeners.get(event);
+          if (globalListeners) {
+            for (const listener of listeners) {
+              globalListeners.delete(listener);
+            }
+            // Clean up empty event listener sets
+            if (globalListeners.size === 0) {
+              this.eventListeners.delete(event);
+            }
+          }
+        }
+        this.pluginListeners.delete(plugin.name);
+      }
+      throw error;  // Re-throw the original error
     } finally {
       // Clear installation context even if install fails
       this.currentlyInstallingPlugin = null;
@@ -216,14 +235,19 @@ export class PluginSystem {
 
   /**
    * Calls a registered function by name.
-   * 
+   *
    * @param name - Function name
    * @param args - Arguments to pass to function
    * @returns Function result
+   * @throws {Error} When function is not registered
+   * @throws {any} Any error thrown by the called function (not caught)
+   *
+   * @note Errors from the called function propagate to the caller.
+   *       Unlike emit(), this method does not catch errors.
    */
   call(name: string, ...args: any[]): any {
     validateString(name, 'name');
-    
+
     const fn = this.functions.get(name);
     if (!fn) {
       throw new Error(`Function '${name}' is not registered`);

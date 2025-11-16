@@ -3,12 +3,12 @@ import { validateArray, validateFunction } from '../../utils/validators';
 
 /**
  * Returns unique elements based on a key selector function.
- * 
+ *
  * @param array - The array to get unique elements from
  * @param selector - Function to extract the comparison key
  * @returns Array with unique elements based on selector
  * @throws {ValidationError} When array is not an array or selector is not a function
- * 
+ *
  * @example
  * ```typescript
  * const users = [
@@ -19,7 +19,9 @@ import { validateArray, validateFunction } from '../../utils/validators';
  * distinctBy(users, u => u.id);
  * // Returns: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }]
  * ```
- * 
+ *
+ * @note Uses reference equality for object keys. For deep equality of object keys,
+ *       serialize them in the selector: `distinctBy(items, x => JSON.stringify(x.key))`
  * @complexity O(n) - Linear time complexity using Set
  * @since 1.0.0
  */
