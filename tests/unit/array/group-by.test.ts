@@ -48,7 +48,7 @@ describe('groupBy', () => {
 
     it('should pass array to selector function', () => {
       const arr = [1, 2, 3];
-      groupBy(arr, (value, index, array) => {
+      groupBy(arr, (value, _index, array) => {
         expect(array).toBe(arr);
         return value;
       });
@@ -71,7 +71,7 @@ describe('groupBy', () => {
         { id: 5, type: 'a' },
       ];
       const result = groupBy(items, (item) => item.type);
-      expect(result.a).toEqual([
+      expect(result['a']).toEqual([
         { id: 1, type: 'a' },
         { id: 3, type: 'a' },
         { id: 5, type: 'a' },
@@ -133,11 +133,11 @@ describe('groupBy', () => {
 
   describe('error cases', () => {
     it('should throw ValidationError for non-array input', () => {
-      expect(() => groupBy(null as any, (x) => x)).toThrow(ValidationError);
-      expect(() => groupBy(undefined as any, (x) => x)).toThrow(ValidationError);
-      expect(() => groupBy('string' as any, (x) => x)).toThrow(ValidationError);
-      expect(() => groupBy(123 as any, (x) => x)).toThrow(ValidationError);
-      expect(() => groupBy({} as any, (x) => x)).toThrow(ValidationError);
+      expect(() => groupBy(null as any, (x: any) => x)).toThrow(ValidationError);
+      expect(() => groupBy(undefined as any, (x: any) => x)).toThrow(ValidationError);
+      expect(() => groupBy('string' as any, (x: any) => x)).toThrow(ValidationError);
+      expect(() => groupBy(123 as any, (x: any) => x)).toThrow(ValidationError);
+      expect(() => groupBy({} as any, (x: any) => x)).toThrow(ValidationError);
     });
 
     it('should throw ValidationError for non-function selector', () => {
@@ -150,7 +150,7 @@ describe('groupBy', () => {
 
     it('should throw ValidationError with meaningful message', () => {
       try {
-        groupBy(null as any, (x) => x);
+        groupBy(null as any, (x: any) => x);
       } catch (error: any) {
         expect(error.message).toContain('array');
         expect(error.code).toBe('VALIDATION_ERROR');

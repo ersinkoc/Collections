@@ -97,11 +97,13 @@ describe('omit', () => {
     it('should maintain immutability', () => {
       const source = { a: { nested: 1 }, b: 2, c: 3 };
       const result = omit(source, ['b']);
-      
-      expect(result.a).toBe(source.a); // Should share reference
+
+      // Values are deeply cloned to prevent shared references (since previous sessions)
+      expect(result.a).not.toBe(source.a); // Should NOT share reference
+      expect(result.a).toStrictEqual({ nested: 1 }); // But values match
       source.a.nested = 2;
-      expect(result.a.nested).toBe(2); // Changes reflect
-      
+      expect(result.a.nested).toBe(1); // Changes do NOT reflect (deep clone)
+
       const keys = ['b'];
       omit(source, keys as any);
       expect(keys).toEqual(['b']); // Keys array unchanged

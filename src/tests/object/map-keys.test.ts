@@ -122,14 +122,13 @@ describe('mapKeys', () => {
     });
   });
 
-  it('should handle key collisions by overwriting', () => {
+  it('should throw error on key collisions to prevent data loss', () => {
     const obj = { a: 1, A: 2, b: 3 };
-    const result = mapKeys(obj, key => key.toUpperCase());
-    
-    // The behavior depends on iteration order, but one should overwrite the other
-    expect(result['A']).toBeDefined();
-    expect(result['B']).toBe(3);
-    expect(Object.keys(result)).toHaveLength(2);
+
+    // Implementation throws error on duplicate keys to prevent silent data loss
+    expect(() => mapKeys(obj, key => key.toUpperCase())).toThrow(
+      /Mapper produced duplicate key 'A'/
+    );
   });
 
   it('should handle numeric string keys', () => {
@@ -189,21 +188,19 @@ describe('mapKeys', () => {
 
   it('should handle mapper function that returns various types', () => {
     const obj = { a: 1, b: 2, c: 3 };
-    
-    // Numbers as keys (converted to strings)
+
+    // Numbers as keys (converted to strings) - no duplicates
     const numResult = mapKeys(obj, (_, value) => String(value * 10));
     expect(numResult).toEqual({
       '10': 1,
       '20': 2,
       '30': 3
     });
-    
-    // Booleans as keys (converted to strings)
-    const boolResult = mapKeys(obj, (_, value) => String(value > 1));
-    expect(boolResult).toEqual({
-      'false': 1,
-      'true': 3  // Last one wins in case of collision
-    });
+
+    // Booleans as keys would cause collisions - should throw error
+    expect(() => mapKeys(obj, (_, value) => String(value > 1))).toThrow(
+      /Mapper produced duplicate key 'true'/
+    );
   });
 
   it('should handle performance with large objects', () => {

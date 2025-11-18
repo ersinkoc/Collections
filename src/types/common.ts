@@ -10,8 +10,9 @@ export type AsyncPredicate<T> = (value: T, index: number, array: T[]) => Promise
 
 /**
  * Selector function for transforming values
+ * K defaults to any type, but can be constrained (e.g., PropertyKey for groupBy)
  */
-export type Selector<T, K> = (value: T, index: number, array: T[]) => K;
+export type Selector<T, K = any> = (value: T, index: number, array: T[]) => K;
 
 /**
  * Async selector function for async transforming operations
