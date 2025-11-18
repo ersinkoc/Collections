@@ -35,9 +35,12 @@ export function invert<T extends Record<string, string | number>>(
       }
 
       // Check for duplicate values to prevent silent data loss
-      if (Object.prototype.hasOwnProperty.call(result, value as PropertyKey)) {
+      const typedValue = value as PropertyKey;
+      if (Object.prototype.hasOwnProperty.call(result, typedValue)) {
+        // Get the existing key before throwing error (use type assertion for flexibility)
+        const existingKey = (result as any)[value];
         throw new Error(
-          `Duplicate value '${String(value)}' found for keys '${String(result[value as PropertyKey])}' and '${key}'. ` +
+          `Duplicate value '${String(value)}' found for keys '${String(existingKey)}' and '${key}'. ` +
           'Cannot invert object with duplicate values as this would cause data loss.'
         );
       }
